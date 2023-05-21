@@ -1,0 +1,36 @@
+#!/bin/bash
+base=`basename $1 .gjf`
+script=$base.sh
+
+echo "#!/bin/bash" > $script
+echo "#SBATCH -J $base" >> $script
+
+export Cluster_Memory=`grep '%mem' $1 | awk -F= '{ print$2 }' | tr -d '\r' | tr '[:upper:]' '[:lower:]'`
+export tmp=$(basename $Cluster_Memory gb)
+export core_mem=$(echo "$tmp*1024/$2" | bc)
+echo '#SBATCH -n'$2 >> $script
+echo '#SBATCH --mem-per-cpu='$core_mem >> $script
+echo '#SBATCH -p requeue' >> $script
+echo '#SBATCH --nodes=1' >> $script
+echo '#SBATCH --time='$3 >> $script
+
+echo '#SBATCH --mail-type=FAIL,END' >> $script
+echo '#SBATCH --mail-user=gustavo.usuga@uni-rostock.de' >> $script
+
+#echo '#PBS -l nodes='$3':ppn='$2',mem='$Cluster_Memory',pmem='$core_mem'mb,walltime='$4 >> $script
+echo '. /home/ga1017/bin/g16.profile' >> $script
+
+echo 'cd '`pwd` >> $script
+echo 'mkdir -p /scratch/ga1017/gaussian/${base}' >> $script
+echo 'export GAUSS_SCRDIR=\"/scratch/ga1017/gaussian/${base}\"' >> $script
+
+echo "g16 $1" >> $script
+
+echo 'if [ -d ${MYSCRATCH} ]; then' >> $script
+  echo 'rm -rf ${MYSCRATCH}' >> $script
+  echo "echo "Removed ${MYSCRATCH}"" >> $script
+echo "fi" >> $script
+
+echo "exit 0" >> $script
+
+sbatch $script 

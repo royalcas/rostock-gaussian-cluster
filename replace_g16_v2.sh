@@ -1,0 +1,1 @@
+sed -i 's/utpsstpss/utpsstpss\/def2svp/' ./cdc_axi_exo_E03_I2.gjf
