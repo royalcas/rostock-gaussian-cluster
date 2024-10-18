@@ -1,36 +1,64 @@
 #!/bin/bash
-base=`basename $1 .gjf`
-script=$base.sh
 
+# Set base name and script file name
+base=$(basename $1 .gjf)
+script="$base.sh"
+
+# Process Variables Definition
+NODES=${4:-1}
+CORE_AMOUNT=${2:-32}
+EXECUTION_TIME=${3:-72:00:00}
+
+# Create the SLURM script file
 echo "#!/bin/bash" > $script
 echo "#SBATCH -J $base" >> $script
 
-export Cluster_Memory=`grep '%mem' $1 | awk -F= '{ print$2 }' | tr -d '\r' | tr '[:upper:]' '[:lower:]'`
-export tmp=$(basename $Cluster_Memory gb)
-export core_mem=$(echo "$tmp*1024/$2" | bc)
-echo '#SBATCH -n'$2 >> $script
-echo '#SBATCH --mem-per-cpu='$core_mem >> $script
+# Memory configuration
+export ClusterMemory=$(grep '%mem' $1 | awk -F= '{ print $2 }' | tr -d '\r' | tr '[:upper:]' '[:lower:]')
+export ClusterMemoryGB=$(basename $ClusterMemory gb)
+export MemoryPerCore=$(echo "$ClusterMemoryGB*1024/$CORE_AMOUNT" | bc)
+echo '#SBATCH -n '$CORE_AMOUNT >> $script
+echo '#SBATCH --mem-per-cpu='$MemoryPerCore >> $script
 echo '#SBATCH -p compute' >> $script
-echo '#SBATCH --nodes=1' >> $script
-echo '#SBATCH --time='$3 >> $script
-
+echo '#SBATCH --nodes='$NODES >> $script
+echo '#SBATCH --time='$EXECUTION_TIME >> $script
 echo '#SBATCH --mail-type=FAIL,END' >> $script
 echo '#SBATCH --mail-user=gustavo.usuga@uni-rostock.de' >> $script
 
-#echo '#PBS -l nodes='$3':ppn='$2',mem='$Cluster_Memory',pmem='$core_mem'mb,walltime='$4 >> $script
+# Load Gaussian module
 echo '. /home/ga1017/bin/g16.profile' >> $script
 
-echo 'cd '`pwd` >> $script
-echo 'mkdir -p /scratch/ga1017/gaussian/${base}' >> $script
-echo 'export GAUSS_SCRDIR=\"/scratch/ga1017/gaussian/${base}\"' >> $script
+# Create working directory and set Gaussian scratch directory
+echo 'Indir=$(pwd)' >> $script
+echo "mkdir -p /scratch/ga1017/gaussian/\$base" >> $script
+echo 'export GAUSS_SCRDIR="/scratch/ga1017/gaussian/$base"' >> $script
 
+# Run Gaussian job
 echo "g16 $1" >> $script
 
-echo 'if [ -d ${MYSCRATCH} ]; then' >> $script
-  echo 'rm -rf ${MYSCRATCH}' >> $script
-  echo "echo "Removed ${MYSCRATCH}"" >> $script
-echo "fi" >> $script
+# Clean up scratch directory after job completion
+echo 'if [ -d ${GAUSS_SCRDIR} ]; then' >> $script
+echo '  rm -rf ${GAUSS_SCRDIR}' >> $script
+echo '  echo "Removed ${GAUSS_SCRDIR}"' >> $script
+echo 'fi' >> $script
 
+# Exit script
 echo "exit 0" >> $script
 
-sbatch $script 
+# Display job submission information in terminal
+echo "---------------------------------------------"
+echo "|          Job Submission Information       |"
+echo "---------------------------------------------"
+echo "| Input File        : $1"
+echo "| Core Amount       : $CORE_AMOUNT"
+echo "| Execution Time    : $EXECUTION_TIME"
+echo "| Nodes             : $NODES"
+echo "| Memory Per Core   : $MemoryPerCore MB"
+echo "---------------------------------------------"
+echo "| Script Created    : Yes"
+echo "| Job Submitted     : Yes"
+echo "---------------------------------------------"
+
+# Submit the SLURM job
+sbatch $script
+ 
